@@ -1,9 +1,12 @@
 package com.example.modbusslavedemo.modbus2;
 
+import com.digitalpetri.modbus.FunctionCode;
 import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
 import com.digitalpetri.modbus.slave.ModbusTcpSlave;
@@ -45,29 +48,49 @@ public class SlaveExample {
 //                String clientRemoteAddress = service.getChannel().remoteAddress().toString();
 //                String clientIp = clientRemoteAddress.replaceAll(".*/(.*):.*", "$1");
 //                String clientPort = clientRemoteAddress.replaceAll(".*:(.*)", "$1");
-                logger.info("read holding register");
-                ReadHoldingRegistersRequest request = service.getRequest();
 
-                ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
+//                ReadHoldingRegistersRequest request = service.getRequest();
+//
+//                ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
+//                for (int i = 0; i < request.getQuantity(); i++) {
+//                    registers.writeShort(i);
+//                }
+//
+//                service.sendResponse(new ReadHoldingRegistersResponse(registers));
+//
+//                ReferenceCountUtil.release(request);
+            }
 
-                for (int i = 0; i < request.getQuantity(); i++) {
-                    registers.writeShort(i);
-                }
+            @Override
+            public void onWriteSingleRegister(ServiceRequest<WriteSingleRegisterRequest, WriteSingleRegisterResponse> service) {
+                WriteSingleRegisterRequest request = service.getRequest();
+                FunctionCode functionCode = request.getFunctionCode();
+                int address = request.getAddress();
+                int value = request.getValue();
+                logger.error("function:"+functionCode+",address:"+address+  ",value:" + value);
 
-                service.sendResponse(new ReadHoldingRegistersResponse(registers));
+                service.sendResponse(new WriteSingleRegisterResponse(address,value));
 
                 ReferenceCountUtil.release(request);
             }
 
             @Override
-            public void onWriteSingleRegister(ServiceRequest<WriteSingleRegisterRequest, WriteSingleRegisterResponse> service) {
-                logger.info(service.toString());
+            public void onWriteMultipleRegisters(ServiceRequest<WriteMultipleRegistersRequest, WriteMultipleRegistersResponse> service) {
+                WriteMultipleRegistersRequest request = service.getRequest();
+                ByteBuf values = request.getValues();
+                int readableLen = values.readableBytes();
             }
 
             @Override
             public void onWriteSingleCoil(ServiceRequest<WriteSingleCoilRequest, WriteSingleCoilResponse> service) {
-                logger.info(service.toString() );
+                WriteSingleCoilRequest request = service.getRequest();
+                FunctionCode functionCode = request.getFunctionCode();
+                int address = request.getAddress();
+                int value = request.getValue();
+                logger.error("function:"+functionCode+",address:"+address+  ",value:" + value);
             }
+
+
         });
 
         slave.bind("192.168.0.119", 8888).get();
