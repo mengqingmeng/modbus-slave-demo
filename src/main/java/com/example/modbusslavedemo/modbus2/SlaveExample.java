@@ -67,7 +67,7 @@ public class SlaveExample {
                 FunctionCode functionCode = request.getFunctionCode();
                 int address = request.getAddress();
                 int value = request.getValue();
-                logger.error("function:"+functionCode+",address:"+address+  ",value:" + value);
+                logger.error("**function:"+functionCode+",address:"+address+  ",value:" + value);
 
                 service.sendResponse(new WriteSingleRegisterResponse(address,value));
 
@@ -76,6 +76,7 @@ public class SlaveExample {
 
             @Override
             public void onWriteMultipleRegisters(ServiceRequest<WriteMultipleRegistersRequest, WriteMultipleRegistersResponse> service) {
+                logger.info("**onWriteMultipleRegisters**");
                 WriteMultipleRegistersRequest request = service.getRequest();
                 ByteBuf values = request.getValues();
                 int readableLen = values.readableBytes();
@@ -87,7 +88,7 @@ public class SlaveExample {
                 FunctionCode functionCode = request.getFunctionCode();
                 int address = request.getAddress();
                 int value = request.getValue();
-                logger.error("function:"+functionCode+",address:"+address+  ",value:" + value);
+                logger.error("**function:"+functionCode+",address:"+address+  ",value:" + value);
             }
 
 
