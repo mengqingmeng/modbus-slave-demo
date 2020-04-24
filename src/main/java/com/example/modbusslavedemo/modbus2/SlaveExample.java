@@ -1,14 +1,8 @@
 package com.example.modbusslavedemo.modbus2;
 
 import com.digitalpetri.modbus.FunctionCode;
-import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
-import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
-import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
-import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
-import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
-import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
-import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
-import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
+import com.digitalpetri.modbus.requests.*;
+import com.digitalpetri.modbus.responses.*;
 import com.digitalpetri.modbus.slave.ModbusTcpSlave;
 import com.digitalpetri.modbus.slave.ModbusTcpSlaveConfig;
 import com.digitalpetri.modbus.slave.ServiceRequestHandler;
@@ -18,6 +12,8 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -33,16 +29,23 @@ public class SlaveExample {
         new SlaveExample().start();
     }
 
+    HashMap<Integer,Object> map = new HashMap<>();
+
+
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final ModbusTcpSlaveConfig config = new ModbusTcpSlaveConfig.Builder().build();
     private final ModbusTcpSlave slave = new ModbusTcpSlave(config);
 
     public SlaveExample() {
+        map.put(0, 'S');
+        map.put(2, 1);
+        map.put(4, 3.56f);
     }
 
     public void start() throws ExecutionException, InterruptedException {
         slave.setRequestHandler(new ServiceRequestHandler() {
+            // 0x03
             @Override
             public void onReadHoldingRegisters(ServiceRequest<ReadHoldingRegistersRequest, ReadHoldingRegistersResponse> service) {
 //                String clientRemoteAddress = service.getChannel().remoteAddress().toString();
@@ -51,8 +54,15 @@ public class SlaveExample {
                 ReadHoldingRegistersRequest request = service.getRequest();
 
                 ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
-                for (int i = 0; i < request.getQuantity(); i++) {
-                    registers.writeShort(i);
+                //logger.error("**function:"+request.getFunctionCode().getCode()+",address:"+request.getAddress()+  ",quantity:" + request.getQuantity());
+                for (Object value : map.values()) {
+                    if (value instanceof Character){
+                        registers.writeInt(97);
+                    }else if (value instanceof Integer){
+                        registers.writeInt((Integer)value);
+                    }else if (value instanceof Float){
+                        registers.writeFloat((Float) value);
+                    }
                 }
 
                 service.sendResponse(new ReadHoldingRegistersResponse(registers));
@@ -83,10 +93,22 @@ public class SlaveExample {
                 int quantity = request.getQuantity();
                 ByteBuf byteBuf = request.getValues();
                 int readableBytes = byteBuf.readableBytes();
+
                 byte[] bytes = new byte[readableBytes];
                 byteBuf.readBytes(bytes);
+                Object value = map.get(address);
+                if (value instanceof Character){
+                    System.out.println("result: " +   value);
+                    map.put(address,value);
+                }else if (value instanceof Integer){
+                    map.put(address,bytesToInt(bytes));
+                    System.out.println("result: " +   bytesToInt(bytes));
+                }else if (value instanceof Float){
+                    map.put(address,bytesToInt(bytes));
+                    System.out.println("result: " +   bytesToInt(bytes));
+                }
                 service.sendResponse(new WriteMultipleRegistersResponse(address,quantity));
-                System.out.println("write bytes length:" + bytes.length + ",code:"+functionCode.getCode()+",address:" + address+",value:" + bytesToInt(bytes));
+                System.out.println("write bytes length:" + bytes.length + ",code:"+functionCode.getCode()+",address:" + address+",value:" + byte2float(bytes,0));
 
             }
 
@@ -99,7 +121,33 @@ public class SlaveExample {
                 logger.error("**function:"+functionCode+",address:"+address+  ",value:" + value);
             }
 
+            @Override
+            public void onReadInputRegisters(ServiceRequest<ReadInputRegistersRequest, ReadInputRegistersResponse> service) {
+                ReadInputRegistersRequest request = service.getRequest();
+                FunctionCode functionCode = request.getFunctionCode();
+                int address = request.getAddress();
+                int quantity = request.getQuantity();
+                ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
 
+                for (int i = 0; i < quantity; i++) {
+                    registers.writeShort(0);
+                }
+
+                service.sendResponse(new ReadInputRegistersResponse(registers));
+
+                ReferenceCountUtil.release(request);
+                logger.error("**function:"+functionCode+",address:"+address+  ",quantity:" + quantity);
+            }
+
+            @Override
+            public void onReadCoils(ServiceRequest<ReadCoilsRequest, ReadCoilsResponse> service) {
+                System.out.println("onReadInputRegisters");
+            }
+
+            @Override
+            public void onReadDiscreteInputs(ServiceRequest<ReadDiscreteInputsRequest, ReadDiscreteInputsResponse> service) {
+                System.out.println("onReadDiscreteInputs");
+            }
         });
 
         slave.bind("192.168.0.109", 8888).get();
@@ -115,5 +163,17 @@ public class SlaveExample {
             a += bs[i] * Math.pow(255, bs.length - i - 1);
         }
         return a;
+    }
+
+    public static float byte2float(byte[] b, int index) {
+        int l;
+        l = b[index + 0];
+        l &= 0xff;
+        l |= ((long) b[index + 1] << 8);
+        l &= 0xffff;
+        l |= ((long) b[index + 2] << 16);
+        l &= 0xffffff;
+        l |= ((long) b[index + 3] << 24);
+        return Float.intBitsToFloat(l);
     }
 }
