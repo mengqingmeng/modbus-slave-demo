@@ -48,17 +48,16 @@ public class SlaveExample {
 //                String clientRemoteAddress = service.getChannel().remoteAddress().toString();
 //                String clientIp = clientRemoteAddress.replaceAll(".*/(.*):.*", "$1");
 //                String clientPort = clientRemoteAddress.replaceAll(".*:(.*)", "$1");
+                ReadHoldingRegistersRequest request = service.getRequest();
 
-//                ReadHoldingRegistersRequest request = service.getRequest();
-//
-//                ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
-//                for (int i = 0; i < request.getQuantity(); i++) {
-//                    registers.writeShort(i);
-//                }
-//
-//                service.sendResponse(new ReadHoldingRegistersResponse(registers));
-//
-//                ReferenceCountUtil.release(request);
+                ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
+                for (int i = 0; i < request.getQuantity(); i++) {
+                    registers.writeShort(i);
+                }
+
+                service.sendResponse(new ReadHoldingRegistersResponse(registers));
+
+                ReferenceCountUtil.release(request);
             }
 
             @Override
@@ -67,7 +66,7 @@ public class SlaveExample {
                 FunctionCode functionCode = request.getFunctionCode();
                 int address = request.getAddress();
                 int value = request.getValue();
-                logger.error("**function:"+functionCode+",address:"+address+  ",value:" + value);
+                logger.error("**客户端来值:"+functionCode+",address:"+address+  ",value:" + value);
 
                 service.sendResponse(new WriteSingleRegisterResponse(address,value));
 
@@ -76,10 +75,19 @@ public class SlaveExample {
 
             @Override
             public void onWriteMultipleRegisters(ServiceRequest<WriteMultipleRegistersRequest, WriteMultipleRegistersResponse> service) {
-                logger.info("**onWriteMultipleRegisters**");
+                short slaveId= service.getUnitId();
+                logger.info("**onWriteMultipleRegisters**:slaveId:" +slaveId);
                 WriteMultipleRegistersRequest request = service.getRequest();
-                ByteBuf values = request.getValues();
-                int readableLen = values.readableBytes();
+                int address = request.getAddress();
+                FunctionCode functionCode = request.getFunctionCode();
+                int quantity = request.getQuantity();
+                ByteBuf byteBuf = request.getValues();
+                int readableBytes = byteBuf.readableBytes();
+                byte[] bytes = new byte[readableBytes];
+                byteBuf.readBytes(bytes);
+                service.sendResponse(new WriteMultipleRegistersResponse(address,quantity));
+                System.out.println("write bytes length:" + bytes.length + ",code:"+functionCode.getCode()+",address:" + address+",value:" + bytesToInt(bytes));
+
             }
 
             @Override
@@ -94,10 +102,18 @@ public class SlaveExample {
 
         });
 
-        slave.bind("192.168.0.119", 8888).get();
+        slave.bind("192.168.0.109", 8888).get();
     }
 
     public void stop() {
         slave.shutdown();
+    }
+
+    public static int bytesToInt(byte[] bs) {
+        int a = 0;
+        for (int i = bs.length - 1; i >= 0; i--) {
+            a += bs[i] * Math.pow(255, bs.length - i - 1);
+        }
+        return a;
     }
 }
